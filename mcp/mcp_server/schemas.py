@@ -329,6 +329,22 @@ class GetEndpointsInput(BaseModel):
     )
 
 
+class GetPersistentVolumeClaimInput(BaseModel):
+    """Input schema for get_persistent_volume_claim tool."""
+
+    namespace: Optional[str] = Field(
+        default=None,
+        description="Namespace containing the PVC"
+    )
+    claim_name: str = Field(
+        description="Name of the PersistentVolumeClaim"
+    )
+    include_events: bool = Field(
+        default=False,
+        description="Also fetch recent volume-related events for the PVC when available"
+    )
+
+
 class GetRolloutStatusInput(BaseModel):
     """Input schema for get_rollout_status tool."""
     
