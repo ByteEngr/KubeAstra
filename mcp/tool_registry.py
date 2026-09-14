@@ -203,6 +203,17 @@ def _handle_analyze_namespace(params: dict, ctx: DispatchContext) -> dict:
     return analyze_namespace(params.get("namespace") or "default")
 
 
+def _handle_analyze_k8s_health(params: dict, ctx: DispatchContext) -> dict:
+    from k8s.analyzer import run_health_analyzer
+    result = run_health_analyzer(
+        scope_type=params.get("scope_type", "namespace"),
+        namespace=params.get("namespace", "default"),
+        resource_name=params.get("resource_name"),
+        resource_kind=params.get("resource_kind"),
+    )
+    return result.to_dict()
+
+
 def _handle_get_persistent_volume_claim(params: dict, ctx: DispatchContext) -> dict:
     from k8s.wrappers import get_persistent_volume_claim
     return get_persistent_volume_claim(
@@ -769,6 +780,7 @@ from mcp_server.schemas import (
     SearchDeploymentRepoInput, GetDeploymentRepoFileInput,
     ListDeploymentRepoPathInput,
     InvestigatePodInput, InvestigateWorkloadInput, AnalyzeNamespaceInput,
+    AnalyzeK8sHealthInput,
     PromQueryInput,
     ExecPodCommandInput, DeletePodInput, RolloutRestartInput,
     ScaleDeploymentInput, ApplyPatchInput,
@@ -828,6 +840,19 @@ _reg(ToolDef(
     handler=_handle_analyze_namespace,
     schema=AnalyzeNamespaceInput,
     description="Holistic health check of an entire namespace: all pods, events, services, issues.",
+    category="investigation",
+    surfaces=_ALL,
+))
+
+_reg(ToolDef(
+    name="analyze_k8s_health",
+    handler=_handle_analyze_k8s_health,
+    schema=AnalyzeK8sHealthInput,
+    description=(
+        "First-party deterministic health analyzer: inspects pods, nodes, services, "
+        "rollouts, and events without LLM calls. Returns structured findings, evidence, "
+        "and recommended diagnostic steps."
+    ),
     category="investigation",
     surfaces=_ALL,
 ))
