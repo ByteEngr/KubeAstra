@@ -18,6 +18,7 @@ from tool_registry import (  # noqa: E402
 EXPECTED_TOOLS = {
     "add_kubeconfig_context",
     "analyze_error",
+    "analyze_k8s_health",
     "analyze_namespace",
     "apply_patch",
     "cluster_report",
@@ -73,6 +74,7 @@ EXPECTED_TOOLS = {
 
 EXPECTED_CHAT_TOOLS = {
     "analyze_error",
+    "analyze_k8s_health",
     "analyze_namespace",
     "cluster_report",
     "diff_helm_revisions",
