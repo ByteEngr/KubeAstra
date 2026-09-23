@@ -223,6 +223,27 @@ def _handle_get_persistent_volume_claim(params: dict, ctx: DispatchContext) -> d
     )
 
 
+def _handle_get_ingress(params: dict, ctx: DispatchContext) -> dict:
+    from k8s.wrappers import get_ingress
+    return get_ingress(
+        params.get("namespace") or "default",
+        params["ingress_name"],
+        rules_only=bool(params.get("rules_only", False)),
+        tls_only=bool(params.get("tls_only", False)),
+        backends_only=bool(params.get("backends_only", False)),
+        include_events=bool(params.get("include_events", False)),
+    )
+
+
+def _handle_investigate_ingress(params: dict, ctx: DispatchContext) -> dict:
+    from k8s.wrappers import investigate_ingress
+    return investigate_ingress(
+        params.get("namespace") or "default",
+        params["ingress_name"],
+    )
+
+
+
 # -- Discovery tools --
 
 def _handle_find_workload(params: dict, ctx: DispatchContext) -> dict:
@@ -774,6 +795,7 @@ from mcp_server.schemas import (
     DescribePodInput, GetPodLogsInput, GetEventsInput,
     GetDeploymentInput, GetServiceInput, GetEndpointsInput,
     GetPersistentVolumeClaimInput, GetRecentChangesInput,
+    GetIngressInput, InvestigateIngressInput,
     GetRolloutStatusInput, K8sgptAnalyzeInput,
     AddKubeconfigContextInput, ListKubeconfigContextsInput,
     SwitchKubeconfigContextInput, GetCurrentContextInput,
@@ -852,6 +874,30 @@ _reg(ToolDef(
         "First-party deterministic health analyzer: inspects pods, nodes, services, "
         "rollouts, and events without LLM calls. Returns structured findings, evidence, "
         "and recommended diagnostic steps."
+    ),
+    category="investigation",
+    surfaces=_ALL,
+))
+
+_reg(ToolDef(
+    name="get_ingress",
+    handler=_handle_get_ingress,
+    schema=GetIngressInput,
+    description=(
+        "Fetch an Ingress resource: host rules, backend service mappings, path types, "
+        "TLS secret configs, load balancer IPs, and annotations."
+    ),
+    category="investigation",
+    surfaces=_ALL,
+))
+
+_reg(ToolDef(
+    name="investigate_ingress",
+    handler=_handle_investigate_ingress,
+    schema=InvestigateIngressInput,
+    description=(
+        "Deterministically analyze an Ingress: verify backend Services exist, check endpoint "
+        "readiness, check TLS secret existence, and return health status with remediation steps."
     ),
     category="investigation",
     surfaces=_ALL,

@@ -861,3 +861,46 @@ class AnalyzeK8sHealthInput(BaseModel):
         description="Optional resource kind filter (e.g. Pod, Deployment, Node).",
     )
 
+
+class GetIngressInput(BaseModel):
+    """Input schema for get_ingress tool."""
+
+    namespace: str = Field(
+        default="default",
+        description="Kubernetes namespace containing the Ingress.",
+    )
+    ingress_name: str = Field(
+        ...,
+        description="Name of the Ingress resource.",
+    )
+    rules_only: bool = Field(
+        default=False,
+        description="When true, returns only host rules and backend service path mappings.",
+    )
+    tls_only: bool = Field(
+        default=False,
+        description="When true, returns only TLS configurations and secret names.",
+    )
+    backends_only: bool = Field(
+        default=False,
+        description="When true, returns a flattened list of all backend service targets.",
+    )
+    include_events: bool = Field(
+        default=False,
+        description="When true, includes recent Kubernetes events for this Ingress.",
+    )
+
+
+class InvestigateIngressInput(BaseModel):
+    """Input schema for investigate_ingress tool."""
+
+    namespace: str = Field(
+        default="default",
+        description="Kubernetes namespace containing the Ingress.",
+    )
+    ingress_name: str = Field(
+        ...,
+        description="Name of the Ingress resource to investigate.",
+    )
+
+
