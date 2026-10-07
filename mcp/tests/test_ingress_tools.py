@@ -138,10 +138,8 @@ def test_get_ingress_full_and_focused(mock_ingress_data):
 
 def test_investigate_ingress_healthy(mock_ingress_data):
     mock_runner = MagicMock()
-    mock_runner.run_json.side_effect = [
-        mock_ingress_data,  # get ingress
-        {"items": [{"metadata": {"name": "api-tls-cert"}}]},  # get secret api-tls-cert
-    ]
+    mock_runner.run_json.return_value = mock_ingress_data
+    mock_runner.run.return_value = "secret/api-tls-cert"
 
     mock_svc = {"name": "api-service", "type": "ClusterIP"}
     mock_default_svc = {"name": "default-http-backend", "type": "ClusterIP"}
@@ -160,10 +158,8 @@ def test_investigate_ingress_healthy(mock_ingress_data):
 
 def test_investigate_ingress_missing_backend(mock_ingress_data):
     mock_runner = MagicMock()
-    mock_runner.run_json.side_effect = [
-        mock_ingress_data,  # get ingress
-        {"items": []},  # get secret
-    ]
+    mock_runner.run_json.return_value = mock_ingress_data
+    mock_runner.run.return_value = "secret/api-tls-cert"
 
     with patch("k8s.wrappers.get_runner", return_value=mock_runner), \
          patch("k8s.wrappers.get_service", side_effect=RuntimeError("Service not found")):
@@ -176,10 +172,8 @@ def test_investigate_ingress_missing_backend(mock_ingress_data):
 
 def test_investigate_ingress_unready_endpoints(mock_ingress_data):
     mock_runner = MagicMock()
-    mock_runner.run_json.side_effect = [
-        mock_ingress_data,  # get ingress
-        {"items": []},  # get secret
-    ]
+    mock_runner.run_json.return_value = mock_ingress_data
+    mock_runner.run.return_value = "secret/api-tls-cert"
 
     mock_svc = {"name": "api-service", "type": "ClusterIP"}
     mock_ep_unready = {"ready_count": 0, "not_ready_count": 2}
@@ -195,15 +189,9 @@ def test_investigate_ingress_unready_endpoints(mock_ingress_data):
 
 def test_investigate_ingress_missing_tls_secret(mock_ingress_data):
     mock_runner = MagicMock()
+    mock_runner.run_json.return_value = mock_ingress_data
+    mock_runner.run.side_effect = RuntimeError("Secret not found")
 
-    def mock_run_json(cmd, namespace=None):
-        if "ingress" in cmd:
-            return mock_ingress_data
-        if "secret" in cmd:
-            raise RuntimeError("Secret not found")
-        return {}
-
-    mock_runner.run_json.side_effect = mock_run_json
     mock_svc = {"name": "api-service", "type": "ClusterIP"}
     mock_ep = {"ready_count": 2, "not_ready_count": 0}
 
@@ -224,3 +212,4 @@ def test_investigate_ingress_not_found():
         report = investigate_ingress("prod", "nonexistent-ingress")
         assert report["status"] == "CRITICAL"
         assert report["findings"][0]["category"] == "ingress_not_found"
+

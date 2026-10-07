@@ -2479,7 +2479,8 @@ def get_persistent_volume_claim(
             )
             claim["events"] = events.get("items", [])[:10]
         except Exception as exc:  # pragma: no cover - defensive
-            claim["events"] = {"error": str(exc)}
+            logger.warning(f"Failed to fetch events for PVC {claim_name}: {exc}")
+            claim["events"] = []
 
     return claim
 
@@ -2638,7 +2639,8 @@ def get_ingress(
             )
             parsed["events"] = events.get("items", [])[:10]
         except Exception as exc:  # pragma: no cover
-            parsed["events"] = {"error": str(exc)}
+            logger.warning(f"Failed to fetch events for ingress {ingress_name}: {exc}")
+            parsed["events"] = []
 
     parsed["focused_modes"] = active_modes
     return parsed
@@ -2652,6 +2654,7 @@ def investigate_ingress(namespace: str, ingress_name: str) -> Dict[str, Any]:
     try:
         ing_data = get_ingress(namespace, ingress_name)
     except Exception as exc:
+        logger.warning(f"Failed to fetch ingress {ingress_name} in {namespace}: {exc}")
         return {
             "name": ingress_name,
             "namespace": namespace,
@@ -2660,7 +2663,6 @@ def investigate_ingress(namespace: str, ingress_name: str) -> Dict[str, Any]:
                 "severity": "CRITICAL",
                 "category": "ingress_not_found",
                 "message": f"Ingress '{ingress_name}' not found or unreadable in namespace '{namespace}'",
-                "error": str(exc),
             }],
             "recommendations": ["Verify the ingress name and namespace."],
         }
@@ -2670,9 +2672,20 @@ def investigate_ingress(namespace: str, ingress_name: str) -> Dict[str, Any]:
     verified_backends = []
 
     for b in ing_data.get("backends", []):
-        svc_name = b.get("service_name")
-        if not svc_name:
+        raw_svc_name = b.get("service_name")
+        if not raw_svc_name:
             continue
+        try:
+            svc_name = validate_resource_name(raw_svc_name, "service")
+        except Exception:
+            findings.append({
+                "severity": "CRITICAL",
+                "category": "invalid_backend_service",
+                "service_name": raw_svc_name,
+                "message": f"Invalid backend Service name '{raw_svc_name}' in ingress rules.",
+            })
+            continue
+
         if svc_name not in checked_services:
             try:
                 svc_info = get_service(namespace, svc_name)
@@ -2693,7 +2706,8 @@ def investigate_ingress(namespace: str, ingress_name: str) -> Dict[str, Any]:
                         "message": f"Backend Service '{svc_name}' has 0 ready endpoints/pods serving traffic.",
                     })
             except Exception as exc:
-                checked_services[svc_name] = {"exists": False, "error": str(exc)}
+                logger.warning(f"Backend service {svc_name} investigation failed in {namespace}: {exc}")
+                checked_services[svc_name] = {"exists": False}
                 findings.append({
                     "severity": "CRITICAL",
                     "category": "missing_backend_service",
@@ -2710,18 +2724,19 @@ def investigate_ingress(namespace: str, ingress_name: str) -> Dict[str, Any]:
 
     checked_secrets = []
     for t in ing_data.get("tls", []):
-        sec_name = t.get("secret_name")
-        if sec_name:
+        raw_sec_name = t.get("secret_name")
+        if raw_sec_name:
             try:
-                get_runner().run_json(["get", "secret", sec_name, "-o", "json"], namespace=namespace)
+                sec_name = validate_resource_name(raw_sec_name, "secret")
+                get_runner().run(["get", "secret", sec_name, "-o", "name"], namespace=namespace)
                 checked_secrets.append({"secret_name": sec_name, "exists": True})
-            except Exception as exc:
-                checked_secrets.append({"secret_name": sec_name, "exists": False})
+            except Exception:
+                checked_secrets.append({"secret_name": raw_sec_name, "exists": False})
                 findings.append({
                     "severity": "WARNING",
                     "category": "missing_tls_secret",
-                    "secret_name": sec_name,
-                    "message": f"TLS Secret '{sec_name}' referenced in Ingress TLS config was not found in namespace '{namespace}'.",
+                    "secret_name": raw_sec_name,
+                    "message": f"TLS Secret '{raw_sec_name}' referenced in Ingress TLS config was not found in namespace '{namespace}'.",
                 })
 
     critical_count = sum(1 for f in findings if f["severity"] == "CRITICAL")
@@ -2761,7 +2776,6 @@ def investigate_ingress(namespace: str, ingress_name: str) -> Dict[str, Any]:
         "findings": findings,
         "recommendations": recommendations,
     }
-
 
 
 def get_rollout_status(namespace: str, deployment_name: str) -> Dict[str, Any]:
